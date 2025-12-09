@@ -52,6 +52,16 @@ What makes less sense is needing to create or define multiple MCP servers just i
 
 Is there any mechanism at the moment for associating a particular credential like an environment variable with a profile including a server, so that the environment variable and server definition can be detached as it were?
 
+## Q5:
+
+Let's consider one more type of mixed profile use that we might wish to consider, which is a mixture of additive and reductive to use those terms. 
+
+Let's imagine again that I have a defined baseline utilities for MCP. 
+
+I wish to define a overriding definition within a specific project that's going to remove certain irrelevant MCPS as they're not needed in this workspace, and add one more. The rationale for doing this is again to optimize the amount of tools that I use. I want to minimize the number of extraneous tools I have and maximize the number of ones that achieve the function needed in this workspace
+
+How do I handle this? 
+
 ---
 
 # Responses
@@ -166,3 +176,75 @@ mcpm profile add-server resend --credentials work-resend
 ```
 
 This doesn't exist yet but would address your use case elegantly.
+
+---
+
+## A5: Mixed Additive/Reductive Profiles (Selective Inheritance)
+
+This is the most nuanced case—you want to inherit *most* of your baseline, exclude some, and add new ones. Think of it as "baseline minus X plus Y."
+
+**Implementation approaches:**
+
+**Option 1: Exclude list in project config**
+
+Create a `.mcpm/config.json` in your project that specifies which user-level MCPs to exclude:
+
+```json
+{
+  "inherit": true,
+  "exclude": ["slack-mcp", "notion-mcp", "calendar-mcp"],
+  "profile": "project-specific-additions"
+}
+```
+
+This keeps inheritance on but blocks specific servers from your baseline.
+
+**Option 2: Explicit inclusion list**
+
+Rather than excluding, specify exactly which baseline MCPs you want:
+
+```json
+{
+  "inherit_only": ["resend", "context7", "wasabi"],
+  "profile": "project-additions"
+}
+```
+
+This gives you fine-grained control—only the listed baseline MCPs come through, plus whatever's in your project profile.
+
+**Option 3: Composite profiles at user level**
+
+Create modular profiles that you can combine:
+
+```bash
+# Core utilities everyone needs
+mcpm profile create core-utils
+mcpm add context7 --profile core-utils
+mcpm add resend --profile core-utils
+
+# Development-specific
+mcpm profile create dev-tools
+mcpm add github --profile dev-tools
+mcpm add vercel --profile dev-tools
+
+# Data work
+mcpm profile create data-tools
+mcpm add pinecone --profile data-tools
+mcpm add wasabi --profile data-tools
+```
+
+Then in your project, activate only the relevant combinations:
+```bash
+mcpm profile activate core-utils,data-tools --project
+```
+
+**Option 4: Override with disabled flag**
+
+If MCPM supports disabling inherited servers at project level:
+```bash
+cd ~/repos/project
+mcpm disable slack-mcp --project  # Blocks this from user-level
+mcpm add specialized-tool --project  # Adds project-specific
+```
+
+**Practical recommendation:** Option 3 (modular profiles) gives you the most flexibility without complex config. Build your baseline from composable pieces rather than one monolithic profile, then combine as needed per project.
